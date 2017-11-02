@@ -3,9 +3,12 @@
 __BACKWARDS INCOMPATIBILITIES:__
  * config: Nomad no longer parses Atlas configuration stanzas. Atlas has been
    deprecated since earlier this year. If you have an Atlas stanza in your
-   config file it will have to be removed. 
+   config file it will have to be removed.
 
 IMPROVEMENTS:
+ * api: Allocations now track and return modify time in addition to create time.[GH-3446]
+ * cli: Allocation create and modify times are displayed in a human readable
+   relative format like `6 h ago`.[GH-3449]
  * core: Allow agents to be run in `rpc_upgrade_mode` when migrating a cluster
    to TLS rather than changing `heartbeat_grace`
  * api: Allocations now track and return modify time in addition to create time
@@ -29,14 +32,13 @@ BUG FIXES:
  * cli: Fix panic when running `keyring` commands [GH-3509]
  * client: Fix allocation accounting in GC and trigger GCs on allocation
    updates [GH-3445]
- * core: Fixes an issue with jobs that have `auto_revert` set to true, where reverting 
+ * core: Fixes an issue with jobs that have `auto_revert` set to true, where reverting
    to a previously stable job that fails to start up causes an infinite cycle of reverts [GH-3496]
  * template: Fix issue where multiple environment variable templates would be
    parsed incorrectly when contents of one have changed after the initial
    rendering [GH-3529]
  * sentinel: (Nomad Enterprise) Fix an issue that could cause an import error
    when multiple Sentinel policies are applied
- 
 
 ## 0.7.0 (November 1, 2017)
 
