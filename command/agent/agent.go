@@ -758,14 +758,10 @@ func (a *Agent) Reload(newConfig *Config) error {
 				a.logger.Printf("[WARN] agent: Issue reloading the server's TLS Configuration, consider a full system restart: %v", err.Error())
 				return err
 			}
-		}
-
-		// Reload the TLS configuration for the client or server, depending on how
-		// the agent is configured to run.
-		if s := a.Server(); s != nil {
-			err := s.ReloadTLSConnections()
+		} else if c := a.Client(); c != nil {
+			err := c.ReloadTLSConnections()
 			if err != nil {
-				a.logger.Printf("[WARN] agent: Issue reloading the server's TLS Configuration, consider a full system restart: %v", err.Error())
+				a.logger.Printf("[ERR] agent: Issue reloading the client's TLS Configuration, consider a full system restart: %v", err.Error())
 				return err
 			}
 		}

@@ -302,6 +302,26 @@ func NewClient(cfg *config.Config, consulCatalog consul.CatalogAPI, consulServic
 	return c, nil
 }
 
+// ReloadTLSConnectoins allows a client to reload RPC connections if the
+// client's TLS configuration changes from plaintext to TLS
+func (c *Client) ReloadTLSConnections() error {
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
+
+	if c.config.TLSConfig.EnableRPC {
+		tw, err := c.config.TLSConfiguration().OutgoingTLSWrapper()
+		if err != nil {
+			return err
+		}
+		c.connPool.ReloadTLS(tw)
+	} else {
+		// enable downgrades
+		c.connPool.ReloadTLS(nil)
+	}
+
+	return nil
+}
+
 // init is used to initialize the client and perform any setup
 // needed before we begin starting its various components.
 func (c *Client) init() error {

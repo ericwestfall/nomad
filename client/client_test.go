@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -450,6 +451,58 @@ func TestClient_MixedTLS(t *testing.T) {
 		func() (bool, error) {
 			err := c1.RPC("Node.GetNode", &req, &out)
 			if err == nil {
+				return false, fmt.Errorf("client RPC succeeded when it should have failed:\n%+v", out)
+			}
+			return true, nil
+		},
+		func(err error) {
+			t.Fatalf(err.Error())
+		},
+	)
+}
+
+func TestClient_ReloadTLS(t *testing.T) {
+	t.Parallel()
+	t.Skip("depends on closing non-tls channels on ReloadTLSConnections")
+	assert := assert.New(t)
+
+	s1, addr := testServer(t, func(c *nomad.Config) {
+		c.Region = "dc1"
+	})
+	defer s1.Shutdown()
+	testutil.WaitForLeader(t, s1.RPC)
+
+	const (
+		cafile  = "../helper/tlsutil/testdata/ca.pem"
+		foocert = "../helper/tlsutil/testdata/nomad-foo.pem"
+		fookey  = "../helper/tlsutil/testdata/nomad-foo-key.pem"
+	)
+
+	c1 := testClient(t, func(c *config.Config) {
+		c.Servers = []string{addr}
+		c.TLSConfig = &nconfig.TLSConfig{
+			EnableHTTP:           true,
+			EnableRPC:            true,
+			VerifyServerHostname: true,
+			CAFile:               cafile,
+			CertFile:             foocert,
+			KeyFile:              fookey,
+		}
+	})
+	defer c1.Shutdown()
+
+	err := c1.ReloadTLSConnections()
+	assert.Nil(err)
+
+	req := structs.NodeSpecificRequest{
+		NodeID:       c1.Node().ID,
+		QueryOptions: structs.QueryOptions{Region: "dc1"},
+	}
+	var out structs.SingleNodeResponse
+	testutil.AssertUntil(100*time.Millisecond,
+		func() (bool, error) {
+			err := c1.RPC("Node.GetNode", &req, &out)
+			if err != io.EOF {
 				return false, fmt.Errorf("client RPC succeeded when it should have failed:\n%+v", out)
 			}
 			return true, nil

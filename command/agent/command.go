@@ -15,6 +15,9 @@ import (
 	"syscall"
 	"time"
 
+	flaghelper "github.com/hashicorp/nomad/helper/flag-helpers"
+	gatedwriter "github.com/hashicorp/nomad/helper/gated-writer"
+
 	metrics "github.com/armon/go-metrics"
 	"github.com/armon/go-metrics/circonus"
 	"github.com/armon/go-metrics/datadog"
@@ -23,8 +26,6 @@ import (
 	checkpoint "github.com/hashicorp/go-checkpoint"
 	gsyslog "github.com/hashicorp/go-syslog"
 	"github.com/hashicorp/logutils"
-	flaghelper "github.com/hashicorp/nomad/helper/flag-helpers"
-	gatedwriter "github.com/hashicorp/nomad/helper/gated-writer"
 	"github.com/hashicorp/nomad/nomad/structs/config"
 	"github.com/hashicorp/nomad/version"
 	"github.com/mitchellh/cli"
