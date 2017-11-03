@@ -141,3 +141,10 @@ func (t *TLSConfig) IsEmpty() bool {
 		t.CertFile == "" &&
 		t.KeyFile == ""
 }
+
+// IsEmpty checks to see if every (non-boolean) field in the struct is nil
+func (t *TLSConfig) IsEmpty() bool {
+	return t.CAFile == "" &&
+		t.CertFile == "" &&
+		t.KeyFile == ""
+}
