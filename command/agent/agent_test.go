@@ -638,8 +638,6 @@ func TestServer_Reload_TLS_DowngradeFromTLS(t *testing.T) {
 		TLSConfig: &sconfig.TLSConfig{},
 	}
 
-	assert.NotNil(agentConfig.TLSConfig.GetKeyLoader().Certificate)
-
 	err := agent.Reload(newConfig)
 	assert.Nil(err)
 
