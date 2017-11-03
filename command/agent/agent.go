@@ -733,7 +733,7 @@ func (a *Agent) Reload(newConfig *Config) error {
 
 	if newConfig.TLSConfig != nil {
 		if !a.config.TLSConfig.IsEmpty() && !newConfig.TLSConfig.IsEmpty() {
-			a.logger.Println("[INFO] Updating agent's existing TLS configuration \n\n")
+			a.logger.Println("[INFO] Updating agent's existing TLS configuration")
 			// Handle errors in loading the new certificate files.
 			// This is just a TLS configuration reload, we don't need to refresh
 			// existing network connections
@@ -745,9 +745,9 @@ func (a *Agent) Reload(newConfig *Config) error {
 		a.config.TLSConfig = newConfig.TLSConfig
 
 		if a.config.TLSConfig.IsEmpty() && !newConfig.TLSConfig.IsEmpty() {
-			a.logger.Println("[INFO] Upgrading from plaintext configuration to TLS \n\n")
+			a.logger.Println("[INFO] Upgrading from plaintext configuration to TLS")
 		} else if !a.config.TLSConfig.IsEmpty() && newConfig.TLSConfig.IsEmpty() {
-			a.logger.Println("[WARN] Downgrading agent's existing TLS configuration to plaintext \n\n")
+			a.logger.Println("[WARN] Downgrading agent's existing TLS configuration to plaintext")
 		}
 
 		// Reload the TLS configuration for the client or server, depending on how
