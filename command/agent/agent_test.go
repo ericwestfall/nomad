@@ -560,6 +560,23 @@ func TestAgent_HTTPCheckPath(t *testing.T) {
 	}
 }
 
+func TestServer_Reload_TLS_WithNilConfiguration(t *testing.T) {
+	t.Parallel()
+	assert := assert.New(t)
+
+	logger := log.New(ioutil.Discard, "", 0)
+
+	agent := &Agent{
+		logger: logger,
+		config: &Config{},
+	}
+
+	err, reloadHTTP := agent.Reload(nil)
+	assert.NotNil(err)
+	assert.Equal(false, reloadHTTP)
+	assert.Equal(err.Error(), "cannot reload agent with nil configuration")
+}
+
 func TestServer_Reload_TLS_UpgradeToTLS(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
@@ -596,8 +613,9 @@ func TestServer_Reload_TLS_UpgradeToTLS(t *testing.T) {
 
 	assert.Nil(agentConfig.TLSConfig.GetKeyLoader().Certificate)
 
-	err := agent.Reload(newConfig)
+	err, reloadHTTP := agent.Reload(newConfig)
 	assert.Nil(err)
+	assert.True(reloadHTTP)
 
 	assert.Equal(agent.config.TLSConfig.CAFile, newConfig.TLSConfig.CAFile)
 	assert.Equal(agent.config.TLSConfig.CertFile, newConfig.TLSConfig.CertFile)
@@ -640,8 +658,9 @@ func TestServer_Reload_TLS_DowngradeFromTLS(t *testing.T) {
 
 	assert.False(agentConfig.TLSConfig.IsEmpty())
 
-	err := agent.Reload(newConfig)
+	err, reloadHTTP := agent.Reload(newConfig)
 	assert.Nil(err)
+	assert.True(reloadHTTP)
 
 	assert.True(agentConfig.TLSConfig.IsEmpty())
 }

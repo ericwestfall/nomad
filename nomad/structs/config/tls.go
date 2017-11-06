@@ -139,3 +139,23 @@ func (t *TLSConfig) IsEmpty() bool {
 		t.CertFile == "" &&
 		t.KeyFile == ""
 }
+
+// Equals compares the fields of two TLS configuration objects, returning a
+// boolean indicating if they are the same.
+func (t *TLSConfig) Equals(newConfig *TLSConfig) bool {
+	if t == nil && newConfig == nil {
+		return true
+	}
+
+	if t != nil && newConfig == nil {
+		return false
+	}
+
+	return t.EnableRPC == newConfig.EnableRPC &&
+		t.CAFile == newConfig.CAFile &&
+		t.CertFile == newConfig.CertFile &&
+		t.KeyLoader == newConfig.KeyLoader &&
+		t.KeyFile == newConfig.KeyFile &&
+		t.RPCUpgradeMode == newConfig.RPCUpgradeMode &&
+		t.VerifyHTTPSClient == newConfig.VerifyHTTPSClient
+}

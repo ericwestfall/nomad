@@ -621,11 +621,30 @@ func (c *Command) handleReload(config *Config) *Config {
 		newConf.LogLevel = config.LogLevel
 	}
 
-	// Reloads configuration for an agent running in both client and server mode
-	err := c.agent.Reload(newConf)
+	err := c.httpServer.Shutdown()
 	if err != nil {
-		c.agent.logger.Printf("[ERR] agent: failed to reload the config: %v", err)
+		c.agent.logger.Printf("[ERR] agent: failed to stop HTTP server: %v", err)
+		return nil
 	}
+	time.Sleep(5 * time.Second)
+
+	// Reloads configuration for an agent running in both client and server mode
+	// TODO remove bool to reload HTTP Serv
+	err, _ = c.agent.Reload(newConf)
+	if err != nil {
+		c.agent.logger.Printf("[ERR] agent: failed to reload agent configuration : %v", err)
+		return nil
+	}
+
+	// Wait some time to ensure a clean shutdown
+	time.Sleep(5 * time.Second)
+	http, err := NewHTTPServer(c.agent, c.agent.config)
+	if err != nil {
+		c.agent.logger.Printf("[ERR] agent: failed to reload http server: %v", err)
+		return nil
+	}
+	c.agent.logger.Println("[INFO] agent: successfully restarted the HTTP server")
+	c.httpServer = http
 
 	// If the configuration change is specific only to the server, handle it here
 	if s := c.agent.Server(); s != nil {
@@ -640,6 +659,24 @@ func (c *Command) handleReload(config *Config) *Config {
 	}
 
 	return newConf
+}
+
+func (c *Command) reloadHTTPServerOnConfigChange(newConfig *Config) error {
+	c.agent.logger.Println("[INFO] agent: Reloading HTTP server with new TLS configuration")
+	err := c.httpServer.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	// Wait some time to ensure a clean shutdown
+	time.Sleep(5 * time.Second)
+	http, err := NewHTTPServer(c.agent, c.agent.config)
+	if err != nil {
+		return err
+	}
+	c.httpServer = http
+
+	return nil
 }
 
 // setupTelemetry is used ot setup the telemetry sub-systems

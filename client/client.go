@@ -30,6 +30,7 @@ import (
 	"github.com/hashicorp/nomad/helper/uuid"
 	"github.com/hashicorp/nomad/nomad"
 	"github.com/hashicorp/nomad/nomad/structs"
+	nconfig "github.com/hashicorp/nomad/nomad/structs/config"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/mitchellh/hashstructure"
 	"github.com/shirou/gopsutil/host"
@@ -304,9 +305,11 @@ func NewClient(cfg *config.Config, consulCatalog consul.CatalogAPI, consulServic
 
 // ReloadTLSConnectoins allows a client to reload RPC connections if the
 // client's TLS configuration changes from plaintext to TLS
-func (c *Client) ReloadTLSConnections() error {
+func (c *Client) ReloadTLSConnections(newConfig *nconfig.TLSConfig) error {
 	c.configLock.Lock()
 	defer c.configLock.Unlock()
+
+	c.config.TLSConfig = newConfig
 
 	if c.config.TLSConfig.EnableRPC {
 		tw, err := c.config.TLSConfiguration().OutgoingTLSWrapper()

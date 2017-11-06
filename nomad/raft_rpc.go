@@ -45,7 +45,14 @@ func NewRaftLayer(addr net.Addr, tlsWrap tlsutil.Wrapper) *RaftLayer {
 func (l *RaftLayer) ReloadTLS(tlsWrap tlsutil.Wrapper) {
 	l.closeLock.Lock()
 	defer l.closeLock.Unlock()
+
+	if !l.closed {
+		l.closed = true
+		close(l.closeCh)
+	}
+
 	l.tlsWrap = tlsWrap
+	l.closeCh = make(chan struct{})
 }
 
 // Handoff is used to hand off a connection to the

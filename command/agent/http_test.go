@@ -564,7 +564,7 @@ func TestHTTP_VerifyHTTPSClient_AfterConfigReload(t *testing.T) {
 	assert.Nil(err)
 
 	// Next, reload the TLS configuration
-	err = s.Agent.Reload(newConfig)
+	err, _ = s.Agent.Reload(newConfig)
 	assert.Nil(err)
 
 	// PASS: Requests that specify a valid hostname, CA cert, and client

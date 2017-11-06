@@ -282,7 +282,7 @@ func TestServer_Reload_Vault(t *testing.T) {
 
 // Tests that the server will successfully reload its network connections,
 // upgrading from plaintext to TLS if the server's TLS configuration changes.
-func TestServer_Reload_TLSConnections(t *testing.T) {
+func TestServer_Reload_TLSConnections_PlaintextToTLS(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
 
@@ -312,8 +312,7 @@ func TestServer_Reload_TLSConnections(t *testing.T) {
 		KeyFile:              fookey,
 	}
 
-	s1.config.TLSConfig = newTLSConfig
-	err := s1.ReloadTLSConnections()
+	err := s1.ReloadTLSConnections(newTLSConfig)
 	assert.Nil(err)
 
 	// assert our server is now configured for TLS
@@ -322,5 +321,47 @@ func TestServer_Reload_TLSConnections(t *testing.T) {
 	arg1 := struct{}{}
 	var out1 struct{}
 	newErr := msgpackrpc.CallWithCodec(codec, "Status.Ping", arg1, &out1)
-	assert.Equal(newErr, io.EOF)
+	assert.Equal(io.EOF, newErr)
+}
+
+// Tests that the server will successfully reload its network connections,
+// downgrading from TLS to plaintext if the server's TLS configuration changes.
+func TestServer_Reload_TLSConnections_TLSToPlaintext(t *testing.T) {
+	t.Parallel()
+	assert := assert.New(t)
+
+	const (
+		cafile  = "../helper/tlsutil/testdata/ca.pem"
+		foocert = "../helper/tlsutil/testdata/nomad-foo.pem"
+		fookey  = "../helper/tlsutil/testdata/nomad-foo-key.pem"
+	)
+	dir := tmpDir(t)
+	defer os.RemoveAll(dir)
+	s1 := testServer(t, func(c *Config) {
+		c.DataDir = path.Join(dir, "nodeA")
+		c.TLSConfig = &config.TLSConfig{
+			EnableHTTP:           true,
+			EnableRPC:            true,
+			VerifyServerHostname: true,
+			CAFile:               cafile,
+			CertFile:             foocert,
+			KeyFile:              fookey,
+		}
+	})
+	defer s1.Shutdown()
+
+	codec := rpcClient(t, s1)
+
+	newTLSConfig := &config.TLSConfig{}
+
+	err := s1.ReloadTLSConnections(newTLSConfig)
+	assert.Nil(err)
+
+	// assert that the server configuration is now in plaintext mode
+	assert.Equal(s1.config.TLSConfig.CertFile, "")
+
+	arg1 := struct{}{}
+	var out1 struct{}
+	newErr := msgpackrpc.CallWithCodec(codec, "Status.Ping", arg1, &out1)
+	assert.Nil(newErr)
 }

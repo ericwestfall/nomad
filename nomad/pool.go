@@ -161,6 +161,12 @@ func NewPool(logOutput io.Writer, maxTime time.Duration, maxStreams int, tlsWrap
 func (p *ConnPool) ReloadTLS(tlsWrap tlsutil.RegionWrapper) {
 	p.Lock()
 	defer p.Unlock()
+
+	oldPool := p.pool
+	for _, conn := range oldPool {
+		conn.Close()
+	}
+	p.pool = make(map[string]*Conn)
 	p.tlsWrap = tlsWrap
 }
 

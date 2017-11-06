@@ -726,48 +726,51 @@ func (a *Agent) Stats() map[string]map[string]string {
 
 // Reload handles configuration changes for the agent. Provides a method that
 // is easier to unit test, as this action is invoked via SIGHUP.
-func (a *Agent) Reload(newConfig *Config) error {
-	// If the agent is already running with TLS enabled and the new
-	// configuration specifies a TLS configuration, we need to only reload
-	// its certificates.
+func (a *Agent) Reload(newConfig *Config) (error, bool) {
+	if newConfig == nil || newConfig.TLSConfig == nil {
+		return fmt.Errorf("cannot reload agent with nil configuration"), false
+	}
 
-	if newConfig.TLSConfig != nil {
+	// Don't reload if there is no change in the TLS configuration
+	if !a.config.TLSConfig.Equals(newConfig.TLSConfig) {
+
+		// This is just a TLS configuration reload, we don't need to refresh
+		// existing network connections
 		if !a.config.TLSConfig.IsEmpty() && !newConfig.TLSConfig.IsEmpty() {
 			a.logger.Println("[INFO] Updating agent's existing TLS configuration")
-			// Handle errors in loading the new certificate files.
-			// This is just a TLS configuration reload, we don't need to refresh
-			// existing network connections
-			return a.config.UpdateTLSConfig(newConfig.TLSConfig)
+			return a.config.UpdateTLSConfig(newConfig.TLSConfig), true
 		}
 
-		// Completely reload the agent's TLS configuration.
+		// Completely reload the agent's TLS configuration (moving from non-TLS to
+		// TLS, or vice versa)
 		// This does not handle errors in loading the new TLS configuration
-		a.config.TLSConfig = newConfig.TLSConfig
+		a.config.TLSConfig = newConfig.TLSConfig.Copy()
 
-		if a.config.TLSConfig.IsEmpty() && !newConfig.TLSConfig.IsEmpty() {
-			a.logger.Println("[INFO] Upgrading from plaintext configuration to TLS")
-		} else if !a.config.TLSConfig.IsEmpty() && newConfig.TLSConfig.IsEmpty() {
+		if newConfig.TLSConfig.IsEmpty() {
 			a.logger.Println("[WARN] Downgrading agent's existing TLS configuration to plaintext")
+		} else {
+			a.logger.Println("[INFO] Upgrading from plaintext configuration to TLS")
 		}
 
 		// Reload the TLS configuration for the client or server, depending on how
 		// the agent is configured to run.
 		if s := a.Server(); s != nil {
-			err := s.ReloadTLSConnections()
+			err := s.ReloadTLSConnections(a.config.TLSConfig)
 			if err != nil {
 				a.logger.Printf("[WARN] agent: Issue reloading the server's TLS Configuration, consider a full system restart: %v", err.Error())
-				return err
+				return err, false
 			}
 		} else if c := a.Client(); c != nil {
 			err := c.ReloadTLSConnections()
 			if err != nil {
 				a.logger.Printf("[ERR] agent: Issue reloading the client's TLS Configuration, consider a full system restart: %v", err.Error())
-				return err
+				return err, false
 			}
 		}
+		return nil, true
 	}
 
-	return nil
+	return nil, false
 }
 
 // setupConsul creates the Consul client and starts its main Run loop.

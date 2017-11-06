@@ -2,7 +2,6 @@ package client
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -463,7 +462,6 @@ func TestClient_MixedTLS(t *testing.T) {
 
 func TestClient_ReloadTLS(t *testing.T) {
 	t.Parallel()
-	t.Skip("depends on closing non-tls channels on ReloadTLSConnections")
 	assert := assert.New(t)
 
 	s1, addr := testServer(t, func(c *nomad.Config) {
@@ -480,18 +478,19 @@ func TestClient_ReloadTLS(t *testing.T) {
 
 	c1 := testClient(t, func(c *config.Config) {
 		c.Servers = []string{addr}
-		c.TLSConfig = &nconfig.TLSConfig{
-			EnableHTTP:           true,
-			EnableRPC:            true,
-			VerifyServerHostname: true,
-			CAFile:               cafile,
-			CertFile:             foocert,
-			KeyFile:              fookey,
-		}
 	})
 	defer c1.Shutdown()
 
-	err := c1.ReloadTLSConnections()
+	newConfig := &nconfig.TLSConfig{
+		EnableHTTP:           true,
+		EnableRPC:            true,
+		VerifyServerHostname: true,
+		CAFile:               cafile,
+		CertFile:             foocert,
+		KeyFile:              fookey,
+	}
+
+	err := c1.ReloadTLSConnections(newConfig)
 	assert.Nil(err)
 
 	req := structs.NodeSpecificRequest{
@@ -502,8 +501,8 @@ func TestClient_ReloadTLS(t *testing.T) {
 	testutil.AssertUntil(100*time.Millisecond,
 		func() (bool, error) {
 			err := c1.RPC("Node.GetNode", &req, &out)
-			if err != io.EOF {
-				return false, fmt.Errorf("client RPC succeeded when it should have failed:\n%+v", out)
+			if err == nil {
+				return false, fmt.Errorf("client RPC succeeded when it should have failed:\n%+v", err)
 			}
 			return true, nil
 		},

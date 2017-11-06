@@ -1,6 +1,7 @@
 package nomad
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"github.com/hashicorp/nomad/nomad/deploymentwatcher"
 	"github.com/hashicorp/nomad/nomad/state"
 	"github.com/hashicorp/nomad/nomad/structs"
+	"github.com/hashicorp/nomad/nomad/structs/config"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
 	"github.com/hashicorp/serf/serf"
@@ -87,6 +89,7 @@ type Server struct {
 
 	// Connection pool to other Nomad servers
 	connPool *ConnPool
+	//connPoolContext context.Context
 
 	// Endpoints holds our RPC endpoints
 	endpoints endpoints
@@ -109,7 +112,8 @@ type Server struct {
 	rpcAdvertise net.Addr
 
 	// rpcTLS is the TLS config for incoming TLS requests
-	rpcTLS *tls.Config
+	rpcTLS    *tls.Config
+	rpcCancel context.CancelFunc
 
 	// peers is used to track the known Nomad servers. This is
 	// used for region forwarding and clustering.
@@ -329,7 +333,9 @@ func NewServer(config *Config, consulCatalog consul.CatalogAPI, logger *log.Logg
 	go s.serfEventHandler()
 
 	// Start the RPC listeners
-	go s.listen()
+	ctx, cancel := context.WithCancel(context.Background())
+	s.rpcCancel = cancel
+	go s.listen(ctx)
 
 	// Emit metrics for the eval broker
 	go evalBroker.EmitStats(time.Second, s.shutdownCh)
@@ -355,10 +361,10 @@ func NewServer(config *Config, consulCatalog consul.CatalogAPI, logger *log.Logg
 
 // ReloadTLSConnections will completely reload the server's RPC connections if
 // the server is moving from a non-TLS to TLS connection, or vice versa.
-func (s *Server) ReloadTLSConnections() error {
-	s.logger.Printf("[INFO] nomad: reloading server network connections due to server configuration changes")
+func (s *Server) ReloadTLSConnections(newTLSConfig *config.TLSConfig) error {
+	s.logger.Printf("[INFO] nomad: reloading server connections due to configuration changes")
+	s.config.TLSConfig = newTLSConfig
 
-	// Configure TLS wrapper
 	var tlsWrap tlsutil.RegionWrapper
 	var incomingTLS *tls.Config
 	if s.config.TLSConfig.EnableRPC {
@@ -376,15 +382,32 @@ func (s *Server) ReloadTLSConnections() error {
 		incomingTLS = itls
 	}
 
-	// Reset the server's rpcTLS configuration
+	if s.rpcCancel == nil {
+		return fmt.Errorf("unable to reset tls context")
+	}
+
+	s.rpcCancel()
+	s.connPool.ReloadTLS(tlsWrap)
+	time.Sleep(500 * time.Millisecond)
+
 	s.rpcTLS = incomingTLS
 
-	// Reload TLS configuration in the server's conn pool
-	s.connPool.ReloadTLS(tlsWrap)
+	s.rpcListener.Close()
+	time.Sleep(500 * time.Millisecond)
+	list, err := net.ListenTCP("tcp", s.config.RPCAddr)
+	if err != nil || list == nil {
+		return err
+	}
+	time.Sleep(500 * time.Millisecond)
+	s.rpcListener = list
 
-	// Reload TLS configuration for the server's raft layer
+	ctx, cancel := context.WithCancel(context.Background())
+	s.rpcCancel = cancel
+	go s.listen(ctx)
+
 	wrapper := tlsutil.RegionSpecificWrapper(s.config.Region, tlsWrap)
 	s.raftLayer.ReloadTLS(wrapper)
+	time.Sleep(500 * time.Millisecond)
 
 	return nil
 }

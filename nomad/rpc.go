@@ -68,8 +68,15 @@ func NewServerCodec(conn io.ReadWriteCloser) rpc.ServerCodec {
 }
 
 // listen is used to listen for incoming RPC connections
-func (s *Server) listen() {
+func (s *Server) listen(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			s.logger.Println("[INFO] nomad.rpc: Closing server RPC connection")
+			return
+		default:
+		}
+
 		// Accept a connection
 		conn, err := s.rpcListener.Accept()
 		if err != nil {
@@ -150,7 +157,9 @@ func (s *Server) handleMultiplex(conn net.Conn) {
 			}
 			return
 		}
+		// this should also take a context?
 		go s.handleNomadConn(sub)
+		//go s.handleNomadConn(ctx, sub)
 	}
 }
 
@@ -160,6 +169,7 @@ func (s *Server) handleNomadConn(conn net.Conn) {
 	rpcCodec := NewServerCodec(conn)
 	for {
 		select {
+		// here we should handle the case of a connection closing
 		case <-s.shutdownCh:
 			return
 		default:
