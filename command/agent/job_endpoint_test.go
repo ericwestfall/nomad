@@ -646,6 +646,12 @@ func TestHTTP_JobAllocations(t *testing.T) {
 		}
 
 		// Directly manipulate the state
+		testEvent := structs.NewTaskEvent("test event").SetMessage("test message")
+		var events []*structs.TaskEvent
+		events = append(events, testEvent)
+		taskState := &structs.TaskState{Events: events}
+		alloc1.TaskStates = make(map[string]*structs.TaskState)
+		alloc1.TaskStates["test"] = taskState
 		state := s.Agent.server.State()
 		err := state.UpsertAllocs(1000, []*structs.Allocation{alloc1})
 		if err != nil {
@@ -670,6 +676,8 @@ func TestHTTP_JobAllocations(t *testing.T) {
 		if len(allocs) != 1 && allocs[0].ID != alloc1.ID {
 			t.Fatalf("bad: %v", allocs)
 		}
+		expectedDisplayMsg := allocs[0].TaskStates["test"].Events[0].DisplayMessage
+		assert.Equal(t, "test message", expectedDisplayMsg)
 
 		// Check for the index
 		if respW.HeaderMap.Get("X-Nomad-Index") == "" {
